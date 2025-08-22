@@ -1,0 +1,43 @@
+## Main backend FastAPI app (app/main.py)
+from fastapi import FastAPI, WebSocket
+from pydantic import BaseModel
+from typing import Dict
+
+app = FastAPI(title="CredTech API", version="1.0")
+
+class CreditScoreResponse(BaseModel):
+    score: float
+    explanation: Dict[str, float]
+
+# Example in-memory storage
+fake_db = {
+    "issuer123": {
+        "score": 76.5,
+        "explanation": {
+            "EBITDA": 0.4,
+            "Debt Ratio": -0.35,
+            "Sentiment Score": 0.28
+        }
+    }
+}
+
+@app.get("/api/credit-score/{issuer_id}", response_model=CreditScoreResponse)
+async def get_credit_score(issuer_id: str):
+    data = fake_db.get(issuer_id)
+    if data:
+        return data
+    return {"score": None, "explanation": {}}
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    # For demo: send a dummy update every 5 seconds
+    import asyncio
+    import random
+    while True:
+        update = {
+            "issuer": "issuer123",
+            "score": random.uniform(70, 80),
+        }
+        await websocket.send_json(update)
+        await asyncio.sleep(5)
