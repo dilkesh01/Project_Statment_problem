@@ -1,0 +1,71 @@
+import requests
+import json
+
+def fetch_alpha_vantage_daily(symbol: str, api_key: str):
+    url = "https://www.alphavantage.co/query"
+    params = {
+        "function": "TIME_SERIES_DAILY_ADJUSTED",
+        "symbol": symbol,
+        "apikey": api_key
+    }
+    response = requests.get(url, params=params)
+    data = response.json()
+    # Implement further processing here
+    return data
+
+if __name__ == "__main__":
+    API_KEY = "YOUR_ALPHA_VANTAGE_API_KEY"
+    data = fetch_alpha_vantage_daily("IBM", API_KEY)
+    print(json.dumps(data, indent=2))
+version: "3.8"
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///credtech.db
+      - NEWS_API_KEY=${NEWS_API_KEY}
+    volumes:
+      - ./backend/data:/app/data
+    depends_on:
+      - redis
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+events {}
+
+http {
+    upstream backend {
+        server backend:8000;
+    }
+
+    upstream frontend {
+        server frontend:80;
+    }
+
+    server {
+        listen 80;
+
+        location /api/ {
+            proxy_pass http://backend/api/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
+        location / {
+            proxy_pass http://frontend/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+    }
+}
